@@ -1,0 +1,70 @@
+{ 
+  "AWSTemplateFormatVersion" : "2010-09-09",
+
+  "Description" : "Cloudformation template for Solr",
+
+  "Mappings" : {
+    "AWSInstanceType2Arch" : {
+      "t1.micro" : { "Arch" : "64" },
+      "m1.small" : { "Arch" : "64" },
+      "m1.medium" : { "Arch" : "64" },
+      "m1.large" : { "Arch" : "64" },
+      "m1.xlarge" : { "Arch" : "64" },
+      "m2.xlarge" : { "Arch" : "64" },
+      "m2.2xlarge" : { "Arch" : "64" },
+      "m2.4xlarge" : { "Arch" : "64" },
+      "m3.xlarge" : { "Arch" : "64" },
+      "m3.2xlarge" : { "Arch" : "64" },
+      "c1.medium" : { "Arch" : "64" },
+      "c1.xlarge" : { "Arch" : "64" }
+    },
+
+    "AWSRegionArch2AMI" : {
+      "us-east-1" : { "64" : "ami-80d97c9d" }
+    }
+  },
+
+  "Parameters" : {
+    "InstanceType" : {
+      "Description" : "Solr Server EC2 instance type",
+      "Type" : "String",
+      "Default" : "m1.small",
+      "AllowedValues" : [ "t1.micro","m1.small","m1.medium","m1.large","m1.xlarge","m3.xlarge","m3.2xlarge","m2.xlarge","m2.2xlarge","m2.4xlarge","c1.medium","c1.xlarge","cc1.4xlarge","cc2.8xlarge","cg1.4xlarge","hi1.4xlarge","hs1.8xlarge"],
+      "ConstraintDescription" : "must be a valid EC2 instance type."
+    },
+
+    "KeyName" : {
+      "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the web server",
+      "Type" : "String"
+    }
+  },
+
+
+  "Resources" : {
+    "Ec2Instance" : {
+      "Type" : "AWS::EC2::Instance", 
+      "Properties" : {
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, 
+          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
+          "KeyName" : { "Ref" : "KeyName" },
+          "InstanceType" : { "Ref" : "InstanceType" },
+          "BlockDeviceMappings" : [
+            {
+            "DeviceName" : "/dev/sda1",
+            "Ebs" : { "VolumeSize" : "50" } 
+          },{
+            "DeviceName" : "/dev/sdm",
+            "Ebs" : { "VolumeSize" : "100" }
+          }
+          ]
+      }
+    }
+  },
+
+  "Outputs" : {
+    "Instance" : {
+      "Value" : { "Fn::GetAtt" : [ "Ec2Instance", "PublicDnsName" ] },
+      "Description" : "DNS Name of the newly created EC2 instance"
+    }
+  }
+}
