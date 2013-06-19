@@ -25,6 +25,11 @@
   },
 
   "Parameters" : {
+    "ZookeeperHost" : {
+      "Description" : "Hostname and port for one or more zookeeper servers seperated by a comma",
+      "Type" : "String"
+    },
+
     "InstanceType" : {
       "Description" : "Solr Server EC2 instance type",
       "Type" : "String",
@@ -36,34 +41,128 @@
     "KeyName" : {
       "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the web server",
       "Type" : "String"
+    },
+
+    "SecurityGroup" : {
+      "Description" : "Name of an existing EC2 security group which allows communication between solr instances (usually TCP port 8983)",
+      "Type" : "String"
+    },
+
+    "PuppetSolrModuleURI" : {
+      "Description" : "A url pointing to a zip or tar file containing the solr module for puppet",
+      "Type" : "String",
+      "Default" : "https://github.com/o19s/puppet-solr/tarball/master"
     }
   },
 
-
   "Resources" : {
-    "Ec2Instance" : {
+    "SolrInstance" : {
       "Type" : "AWS::EC2::Instance", 
+      "Metadata" : {
+        "AWS::CloudFormation::Init" : {
+          "config" : {
+            "packages" : {
+              "apt" : {
+                "puppet" : []
+              },
+              "rubygems" : {
+                "json_pure" : []
+              }
+            },
+            "files" : {
+              "/etc/puppet/modules/cfn/lib/facter/cfn.rb" : { 
+                "content" : { "Fn::Join" : ["", [
+                  "# cfn.rb", "\n",
+                  "require 'rubygems'", "\n",
+                  "require 'json'", "\n",
+                  "\n",
+                  "filename = \"/var/lib/cfn-init/data/metadata.json\"", "\n",
+                  "if not File.exist?(filename)", "\n",
+                  "   return", "\n",
+                  "end", "\n",
+                  "\n",
+                  "parsed = JSON.load(File.new(filename))", "\n",
+                  "parsed.default = Hash.new", "\n",
+                  "parsed[\"Puppet\"].each do |key, value|", "\n",
+                  "   actual_value = value", "\n",
+                  "   if value.is_a? Array", "\n",
+                  "    actual_value = value.join(',')", "\n",
+                  "   end", "\n",
+                  "   Facter.add(\"cfn_\" + key) do", "\n",
+                  "     setcode do", "\n",
+                  "       actual_value", "\n",
+                  "     end", "\n",
+                  "   end", "\n",
+                  "end", "\n"
+                ]]
+                },
+                "mode" : "100644", 
+                "owner" : "root", 
+                "group" : "wheel" 
+              },
+              "sources" : {
+                "/etc/puppet/modules/solr" : { "Ref" : "PuppetSolrModuleURI" }
+              }
+            }
+          }
+        },
+        "Puppet" : {
+          "zkHost" : { "Ref" : "ZookeeperHost" }
+        }
+      },
+
       "Properties" : {
         "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, 
           { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
           "KeyName" : { "Ref" : "KeyName" },
           "InstanceType" : { "Ref" : "InstanceType" },
+          "SecurityGroups" : [ { "Ref" : "SecurityGroup" } ],
           "BlockDeviceMappings" : [
             {
             "DeviceName" : "/dev/sda1",
             "Ebs" : { "VolumeSize" : "50" } 
-          },{
-            "DeviceName" : "/dev/sdm",
-            "Ebs" : { "VolumeSize" : "100" }
           }
+          ],
+          "UserData" : { "Fn::Base64" : { "Fn::Join" : ["",[
+            "#!/bin/bash","\n",
+            "# redirect logging to an error file","\n",
+            "exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1","\n",
+            "# add the puppet repository to apt-get", "\n",
+            "wget -O /tmp/puppetlabs-release-precise.deb http://apt.puppetlabs.com/puppetlabs-release-precise.deb","\n",
+            "dpkg -i /tmp/puppetlabs-release-precise.deb","\n",
+            "apt-get update","\n",
+            "apt-get -y install python-setuptools","\n",
+            "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz","\n",
+            "## Initialize CloudFormation bits","\n",
+            "cfn-init -v -s ", { "Ref" : "AWS::StackName" }, " -r SolrInstance",
+            "   --region ", { "Ref" : "AWS::Region" }, " >> /tmp/cfn-init.log 2>&1 || error_exit $(</tmp/cfn-init.log)","\n",
+            "puppet apply -e \"package { 'default-jdk': }; include solr\"", "\n",
+            "cfn-signal -s true \"", {"Ref" : "WaitForInstanceWaitHandle"}, "\"\n"
           ]
+          ]
+          }}
+      }
+    },
+
+    "WaitForInstanceWaitHandle" : {
+      "Type" : "AWS::CloudFormation::WaitConditionHandle",
+      "Properties" : {
+      }
+    },
+
+    "WaitForInstance" : {
+      "Type" : "AWS::CloudFormation::WaitCondition",
+      "DependsOn" : "SolrInstance",
+      "Properties" : {
+        "Handle" : {"Ref" : "WaitForInstanceWaitHandle"},
+        "Timeout" : "600"
       }
     }
   },
 
   "Outputs" : {
     "Instance" : {
-      "Value" : { "Fn::GetAtt" : [ "Ec2Instance", "PublicDnsName" ] },
+      "Value" : { "Fn::GetAtt" : [ "SolrInstance", "PublicDnsName" ] },
       "Description" : "DNS Name of the newly created EC2 instance"
     }
   }
