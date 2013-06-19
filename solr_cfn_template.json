@@ -63,7 +63,8 @@
           "config" : {
             "packages" : {
               "apt" : {
-                "puppet" : []
+                "puppet" : [],
+                "rubygems" : []
               },
               "rubygems" : {
                 "json_pure" : []
