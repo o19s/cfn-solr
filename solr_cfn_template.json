@@ -20,13 +20,18 @@
     },
 
     "AWSRegionArch2AMI" : {
-      "us-east-1" : { "64" : "ami-e7582d8e" }
+      "us-east-1" : { "64" : "ami-730c631a" }
     }
   },
 
   "Parameters" : {
     "ZookeeperHost" : {
       "Description" : "Hostname and port for one or more zookeeper servers seperated by a comma",
+      "Type" : "String"
+    },
+
+    "SolrCloudSize" : {
+      "Description" : "How many EC2 instances to launch with SolrCloud",
       "Type" : "String"
     },
 
@@ -56,8 +61,18 @@
   },
 
   "Resources" : {
-    "SolrInstance" : {
-      "Type" : "AWS::EC2::Instance", 
+    "SolrCloudGroup" : {
+      "Type" : "AWS::AutoScaling::AutoScalingGroup",
+      "Properties" : {
+        "AvailabilityZones" : { "Fn::GetAZs" : "" },
+        "LaunchConfigurationName" : { "Ref" : "SolrCloudLaunchConfig" },
+        "MinSize" : { "Ref" : "SolrCloudSize" },
+        "MaxSize" : { "Ref" : "SolrCloudSize" }
+      }
+    },
+    
+    "SolrCloudLaunchConfig" : {
+      "Type" : "AWS::AutoScaling::LaunchConfiguration", 
       "Metadata" : {
         "AWS::CloudFormation::Init" : {
           "config" : {
@@ -128,14 +143,12 @@
             "#!/bin/bash","\n",
             "# redirect logging to an error file","\n",
             "exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1","\n",
-            "# add the puppet repository to apt-get", "\n",
-            "wget -O /tmp/puppetlabs-release-precise.deb http://apt.puppetlabs.com/puppetlabs-release-precise.deb","\n",
-            "dpkg -i /tmp/puppetlabs-release-precise.deb","\n",
-            "apt-get update","\n",
-            "apt-get -y install python-setuptools","\n",
+            "# add the puppet repository to yum", "\n",
+            "rpm -ivh http://yum-enterprise.puppetlabs.com/el/6/extras/i386/puppetlabs-enterprise-release-extras-6-2.noarch.rpm","\n",
+            "yum install python-setuptools","\n",
             "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz","\n",
             "## Initialize CloudFormation bits","\n",
-            "cfn-init -v -s ", { "Ref" : "AWS::StackName" }, " -r SolrInstance",
+            "cfn-init -v -s ", { "Ref" : "AWS::StackName" }, " -r SolrCloudLaunchConfig",
             "   --region ", { "Ref" : "AWS::Region" }, " >> /tmp/cfn-init.log 2>&1 || error_exit $(</tmp/cfn-init.log)","\n",
             "puppet apply -e \"package { 'default-jdk': }; include solr\"", "\n",
             "cfn-signal -s true \"", {"Ref" : "WaitForInstanceWaitHandle"}, "\"\n"
@@ -153,18 +166,13 @@
 
     "WaitForInstance" : {
       "Type" : "AWS::CloudFormation::WaitCondition",
-      "DependsOn" : "SolrInstance",
+      "DependsOn" : "SolrCloudGroup",
       "Properties" : {
+        "Count" :  { "Ref" : "SolrCloudSize" },
         "Handle" : {"Ref" : "WaitForInstanceWaitHandle"},
         "Timeout" : "600"
       }
     }
-  },
-
-  "Outputs" : {
-    "Instance" : {
-      "Value" : { "Fn::GetAtt" : [ "SolrInstance", "PublicDnsName" ] },
-      "Description" : "DNS Name of the newly created EC2 instance"
-    }
   }
+
 }
