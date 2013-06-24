@@ -73,19 +73,25 @@
         "AvailabilityZones" : { "Fn::GetAZs" : "" },
         "LaunchConfigurationName" : { "Ref" : "SolrCloudLaunchConfig" },
         "MinSize" : { "Ref" : "SolrCloudSize" },
-        "MaxSize" : { "Ref" : "SolrCloudSize" }
+        "MaxSize" : { "Ref" : "SolrCloudSize" },
+        "Tags" : [ {
+          "Key" : "Name",
+          "Value" :  { "Fn::Join" : [ "", [{ "Ref" : "AWS::StackName"} , "-solr"]] },
+          "PropagateAtLaunch" : true
+        }
+        ]
       }
     },
-    
+
     "SolrCloudLaunchConfig" : {
       "Type" : "AWS::AutoScaling::LaunchConfiguration", 
       "Metadata" : {
         "AWS::CloudFormation::Init" : {
           "config" : {
             "packages" : {
-              "apt" : {
-                "puppet" : [],
-                "rubygems" : []
+              "yum" : {
+                "rubygems" : [],
+                "puppet" : []
               },
               "rubygems" : {
                 "json_pure" : []
@@ -110,21 +116,22 @@
             "Ebs" : { "VolumeSize" : "50" } 
           }
           ],
+
           "UserData" : { "Fn::Base64" : { "Fn::Join" : ["",[
             "#!/bin/bash","\n",
             "# redirect logging to an error file","\n",
             "exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1","\n",
             "# add the puppet repository to yum", "\n",
-            "rpm -ivh http://yum-enterprise.puppetlabs.com/el/6/extras/i386/puppetlabs-enterprise-release-extras-6-2.noarch.rpm","\n",
+            "rpm -ivh http://yum.puppetlabs.com/el/6/products/i386/puppetlabs-release-6-7.noarch.rpm", "\n",
             "yum install python-setuptools","\n",
-            "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz --use-mirrors","\n",
+            "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz","\n",
             "## Initialize CloudFormation bits","\n",
             "cfn-init -v -s ", { "Ref" : "AWS::StackName" }, " -r SolrCloudLaunchConfig",
             "   --region ", { "Ref" : "AWS::Region" }, " >> /tmp/cfn-init.log 2>&1 || error_exit $(</tmp/cfn-init.log)","\n",
-            "puppet apply -e \"package { 'default-jdk': };", "\n",
-            "   class { \"solr\": ", "\n",
-            "      number_of_cloud_shards => ", { "Ref" : "CloudShards" }, ",", "\n",
-            "      zookeeper_hosts => \"", { "Ref" : "ZookeeperHost" }, "\"}", "\n",
+            "puppet apply -e \"package { 'default-jdk': };",
+            "   class { 'solr': ",
+            "      number_of_cloud_shards => ", { "Ref" : "CloudShards" }, ",",
+            "      zookeeper_hosts => '", { "Ref" : "ZookeeperHost" }, "'}\"", "\n",
             "cfn-signal -s true \"", {"Ref" : "WaitForInstanceWaitHandle"}, "\"\n"
           ]
           ]
