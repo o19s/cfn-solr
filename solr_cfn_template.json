@@ -30,6 +30,12 @@
       "Type" : "String"
     },
 
+    "CloudShards" : {
+      "Description" : "How many shards should be created with the data for Solr Cloud",
+      "Type" : "String",
+      "Default" : "1"
+    },
+
     "SolrCloudSize" : {
       "Description" : "How many EC2 instances to launch with SolrCloud",
       "Type" : "String"
@@ -85,45 +91,10 @@
                 "json_pure" : []
               }
             },
-            "files" : {
-              "/etc/puppet/modules/cfn/lib/facter/cfn.rb" : { 
-                "content" : { "Fn::Join" : ["", [
-                  "# cfn.rb", "\n",
-                  "require 'rubygems'", "\n",
-                  "require 'json'", "\n",
-                  "\n",
-                  "filename = \"/var/lib/cfn-init/data/metadata.json\"", "\n",
-                  "if not File.exist?(filename)", "\n",
-                  "   return", "\n",
-                  "end", "\n",
-                  "\n",
-                  "parsed = JSON.load(File.new(filename))", "\n",
-                  "parsed.default = Hash.new", "\n",
-                  "parsed[\"Puppet\"].each do |key, value|", "\n",
-                  "   actual_value = value", "\n",
-                  "   if value.is_a? Array", "\n",
-                  "    actual_value = value.join(',')", "\n",
-                  "   end", "\n",
-                  "   Facter.add(\"cfn_\" + key) do", "\n",
-                  "     setcode do", "\n",
-                  "       actual_value", "\n",
-                  "     end", "\n",
-                  "   end", "\n",
-                  "end", "\n"
-                ]]
-                },
-                "mode" : "100644", 
-                "owner" : "root", 
-                "group" : "wheel" 
-              },
-              "sources" : {
-                "/etc/puppet/modules/solr" : { "Ref" : "PuppetSolrModuleURI" }
-              }
+            "sources" : {
+              "/etc/puppet/modules/solr" : { "Ref" : "PuppetSolrModuleURI" }
             }
           }
-        },
-        "Puppet" : {
-          "zkHost" : { "Ref" : "ZookeeperHost" }
         }
       },
 
@@ -146,11 +117,14 @@
             "# add the puppet repository to yum", "\n",
             "rpm -ivh http://yum-enterprise.puppetlabs.com/el/6/extras/i386/puppetlabs-enterprise-release-extras-6-2.noarch.rpm","\n",
             "yum install python-setuptools","\n",
-            "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz","\n",
+            "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz --use-mirrors","\n",
             "## Initialize CloudFormation bits","\n",
             "cfn-init -v -s ", { "Ref" : "AWS::StackName" }, " -r SolrCloudLaunchConfig",
             "   --region ", { "Ref" : "AWS::Region" }, " >> /tmp/cfn-init.log 2>&1 || error_exit $(</tmp/cfn-init.log)","\n",
-            "puppet apply -e \"package { 'default-jdk': }; include solr\"", "\n",
+            "puppet apply -e \"package { 'default-jdk': };", "\n",
+            "   class { \"solr\": ", "\n",
+            "      number_of_cloud_shards => ", { "Ref" : "CloudShards" }, ",", "\n",
+            "      zookeeper_hosts => \"", { "Ref" : "ZookeeperHost" }, "\"}", "\n",
             "cfn-signal -s true \"", {"Ref" : "WaitForInstanceWaitHandle"}, "\"\n"
           ]
           ]
