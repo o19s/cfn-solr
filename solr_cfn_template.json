@@ -128,7 +128,7 @@
             "## Initialize CloudFormation bits","\n",
             "cfn-init -v -s ", { "Ref" : "AWS::StackName" }, " -r SolrCloudLaunchConfig",
             "   --region ", { "Ref" : "AWS::Region" }, " >> /tmp/cfn-init.log 2>&1 || error_exit $(</tmp/cfn-init.log)","\n",
-            "puppet apply -e \"package { 'default-jdk': };",
+            "puppet apply -e \"package { 'default-jdk': } ",
             "   class { 'solr': ",
             "      number_of_cloud_shards => ", { "Ref" : "CloudShards" }, ",",
             "      zookeeper_hosts => '", { "Ref" : "ZookeeperHost" }, "'}\"", "\n",
