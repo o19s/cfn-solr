@@ -60,10 +60,17 @@
     },
 
     "PuppetSolrModuleURI" : {
-      "Description" : "A url pointing to a zip or tar file containing the solr module for puppet",
+      "Description" : "[OPTIONAL] A url pointing to a zip or tar file containing the solr module for puppet",
       "Type" : "String",
       "Default" : "https://github.com/o19s/puppet-solr/tarball/master"
+    },
+
+    "PuppetTomcatModuleURI" : {
+      "Description" : "[OPTIONAL] A url pointing to a zip or tar file containing the tomcat module for puppet",
+      "Type" : "String",
+      "Default" : "https://github.com/camptocamp/puppet-tomcat/tarball/master"
     }
+
   },
 
   "Resources" : {
@@ -98,7 +105,29 @@
               }
             },
             "sources" : {
-              "/etc/puppet/modules/solr" : { "Ref" : "PuppetSolrModuleURI" }
+              "/etc/puppet/modules/solr" : { "Ref" : "PuppetSolrModuleURI" },
+              "/etc/puppet/modules/tomcat" : { "Ref" : "PuppetTomcatModuleURI" }
+            },
+            "files" : {
+              "/etc/puppet/base.pp" : {
+                "mode" : "000644",
+                "owner" : "root",
+                "group" : "wheel",
+                "content" : { "Fn::Join" : ["", [
+                    "class { 'solr': ", "\n",
+                    "  number_of_cloud_shards => ", { "Ref" : "CloudShards" }, ",", "\n",
+                    "  zookeeper_hosts => '", { "Ref" : "ZookeeperHost" }, "'", "\n",
+                    "}", "\n",
+                    "include tomcat", "\n",
+                    "", "\n",
+                    "tomcat::instance {\"solr\":", "\n",
+                    "  ensure => present,", "\n",
+                    "  http_port => \"8080\"", "\n",
+                    "}"
+
+                ]]
+                }
+              }
             }
           }
         }
@@ -128,10 +157,7 @@
             "## Initialize CloudFormation bits","\n",
             "cfn-init -v -s ", { "Ref" : "AWS::StackName" }, " -r SolrCloudLaunchConfig",
             "   --region ", { "Ref" : "AWS::Region" }, " >> /tmp/cfn-init.log 2>&1 || error_exit $(</tmp/cfn-init.log)","\n",
-            "puppet apply -e \"package { 'default-jdk': } ",
-            "   class { 'solr': ",
-            "      number_of_cloud_shards => ", { "Ref" : "CloudShards" }, ",",
-            "      zookeeper_hosts => '", { "Ref" : "ZookeeperHost" }, "'}\"", "\n",
+            "puppet apply /etc/puppet/base.pp", "\n",
             "cfn-signal -s true \"", {"Ref" : "WaitForInstanceWaitHandle"}, "\"\n"
           ]
           ]
