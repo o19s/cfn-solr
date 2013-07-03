@@ -59,11 +59,6 @@
       "Type" : "String"
     },
 
-    "OracleJDKInstaller" : {
-      "Description" : "A url pointing to a copy of the Oracle JDK installer that you have previously downloaded and for which you have accepted the terms of use.",
-      "Type" : "String"
-    },
-
     "PuppetSolrModuleURI" : {
       "Description" : "[OPTIONAL] A url pointing to a zip or tar file containing the solr module for puppet",
       "Type" : "String",
@@ -108,8 +103,7 @@
             },
             "sources" : {
               "/etc/puppet/modules/solr" : { "Ref" : "PuppetSolrModuleURI" },
-              "/etc/puppet/modules/tomcat" : { "Ref" : "PuppetTomcatModuleURI" },
-              "/tmp/oracle-jdk" : { "Ref" : "OracleJDKInstaller" }
+              "/etc/puppet/modules/tomcat" : { "Ref" : "PuppetTomcatModuleURI" }
             },
             "files" : {
               "/etc/puppet/base.pp" : {
@@ -117,20 +111,43 @@
                 "owner" : "root",
                 "group" : "wheel",
                 "content" : { "Fn::Join" : ["", [
-                  "class { 'solr': ", "\n",
-                  "  number_of_cloud_shards => ", { "Ref" : "CloudShards" }, ",", "\n",
-                  "  zookeeper_hosts => '", { "Ref" : "ZookeeperHost" }, "'", "\n",
+                  "package { 'java-1.7.0-openjdk':", "\n",
+                  "  ensure => present,", "\n",
+                  "  before => Service['tomcat-solr']", "\n",
                   "}", "\n",
+                  "", "\n",
+                  "class { 'solr':", "\n",
+                  "  number_of_cloud_shards => ", { "Ref" : "CloudShards" } ,",\n",
+                  "  zookeeper_hosts => '", { "Ref" : "ZookeeperHost" }, "'\n",
+                  "}", "\n",
+                  "", "\n",
                   "include tomcat", "\n",
                   "", "\n",
                   "tomcat::instance {\"solr\":", "\n",
                   "  ensure => present,", "\n",
-                  "  http_port => \"8080\"", "\n",
+                  "  http_port => \"8080\",", "\n",
+                  "  java_home=> \"/usr/lib/jvm/java-1.7.0-openjdk-1.7.0.9/jre/\",", "\n",
+                  "  setenv => [\"export ADD_JAVA_OPTS='-Dsolr.solr.home=/etc/solr'\"]", "\n",
                   "}", "\n",
+                  "", "\n",
                   "service { \"iptables\":", "\n",
                   "  ensure => stopped", "\n",
+                  "}", "\n",
+                  "", "\n",
+                  "# prep required solr libs for tomcat", "\n",
+                  "exec { \"cp /opt/solr/example/lib/ext/* /srv/tomcat/solr/lib/\" :", "\n",
+                  "  path => \"/bin\",", "\n",
+                  "  creates => \"/srv/tomcat/solr/lib/log4j-1.2.16.jar\",", "\n",
+                  "  require => Class['solr']", "\n",
+                  "}", "\n",
+                  "", "\n",
+                  "# stage the solr war file for tomcat", "\n",
+                  "exec { \"cp /opt/solr/dist/solr-4.3.0.war /srv/tomcat/solr/webapps/solr.jar\" :", "\n",
+                  "  path => \"/bin\",", "\n",
+                  "  creates => \"/srv/tomcat/solr/webapps/solr.war\",", "\n",
+                  "  require => Exec[\"cp /opt/solr/example/lib/ext/* /srv/tomcat/solr/lib/\"],", "\n",
+                  "  notify => Service['tomcat-solr']", "\n",
                   "}"
-
                 ]]
                 }
               }
@@ -139,13 +156,13 @@
         }
       },
 
-        "Properties" : {
-          "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, 
-            { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
-            "KeyName" : { "Ref" : "KeyName" },
-            "InstanceType" : { "Ref" : "InstanceType" },
-            "SecurityGroups" : [ { "Ref" : "SecurityGroup" } ],
-            "BlockDeviceMappings" : [
+      "Properties" : {
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, 
+          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
+          "KeyName" : { "Ref" : "KeyName" },
+          "InstanceType" : { "Ref" : "InstanceType" },
+          "SecurityGroups" : [ { "Ref" : "SecurityGroup" } ],
+          "BlockDeviceMappings" : [
             {
             "DeviceName" : "/dev/sda1",
             "Ebs" : { "VolumeSize" : "50" } 
