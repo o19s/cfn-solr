@@ -115,8 +115,10 @@
                   "  ensure => stopped", "\n",
                   "}", "\n",
                   "", "\n",
-                  "include solr::tomcat6", "\n"
-
+                  "class { \"solr::tomcat6\":", "\n",
+                  "  zookeeper_hosts => \"ec2-72-44-55-216.compute-1.amazonaws.com:2181\",", "\n",
+                  "  cloud_shards => 1", "\n",
+                  "}"
                 ]]
                 }
               }
