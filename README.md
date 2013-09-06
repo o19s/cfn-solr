@@ -17,6 +17,8 @@ You'll need
 3. An AWS security group that allows instances to communication with
    the zookeeper server over port 8983, and optionally the public access over port 8983
 
+Example AWS security group:
+
 Port (Service)	Source	Action
 22		0.0.0.0/0	Delete
 2181	sg-58d77733	Delete
