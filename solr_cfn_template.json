@@ -1,4 +1,4 @@
-{ 
+{
   "AWSTemplateFormatVersion" : "2010-09-09",
 
   "Description" : "Cloudformation template for Solr",
@@ -6,7 +6,7 @@
   "Mappings" : {
     "AWSInstanceType2Arch" : {
       "t1.micro" : { "Arch" : "64" },
-      "m1.small" : { "Arch" : "64" },
+      "m1.small" : { "Arch" : "32" },
       "m1.medium" : { "Arch" : "64" },
       "m1.large" : { "Arch" : "64" },
       "m1.xlarge" : { "Arch" : "64" },
@@ -20,7 +20,8 @@
     },
 
     "AWSRegionArch2AMI" : {
-      "us-east-1" : { "64" : "ami-730c631a" }
+      "us-east-1" : { "32" : "ami-730c631a", "64" : "ami-7d0c6314" }
+      "us-west-1" : { "32" : "ami-27fad562", "64" : "ami-c7fad582" }
     }
   },
 
@@ -62,7 +63,7 @@
     "PuppetSolrModuleURI" : {
       "Description" : "[OPTIONAL] A url pointing to a zip or tar file containing the solr module for puppet",
       "Type" : "String",
-      "Default" : "https://github.com/o19s/puppet-solr/tarball/jetty_default"
+      "Default" : "https://github.com/o19s/puppet-solr/tarball/master"
     }
   },
 
@@ -109,7 +110,6 @@
                   "", "\n",
                   "class { \"solr::jetty\":", "\n",
                   "  zookeeper_hosts => \"", { "Ref" : "ZookeeperHost" }, "\", ", "\n",
-                  "  number_of_cloud_shards => ", { "Ref" : "CloudShards" }, "\n",
                   "}"
                 ]]
                 }
