@@ -31,11 +31,6 @@
       "Type" : "String"
     },
 
-    "CloudShards" : {
-      "Description" : "How many shards should be created with the data for Solr Cloud",
-      "Type" : "String",
-      "Default" : "1"
-    },
 
     "SolrCloudSize" : {
       "Description" : "How many EC2 instances to launch with SolrCloud",
