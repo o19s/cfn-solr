@@ -20,7 +20,7 @@
     },
 
     "AWSRegionArch2AMI" : {
-      "us-east-1" : { "32" : "ami-730c631a", "64" : "ami-7d0c6314" }
+      "us-east-1" : { "32" : "ami-730c631a", "64" : "ami-7d0c6314" },
       "us-west-1" : { "32" : "ami-27fad562", "64" : "ami-c7fad582" }
     }
   },
@@ -128,7 +128,7 @@
           "BlockDeviceMappings" : [
             {
             "DeviceName" : "/dev/sda1",
-            "Ebs" : { "VolumeSize" : "50" } 
+            "Ebs" : { "VolumeSize" : "200" } 
           }
           ],
 
