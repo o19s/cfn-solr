@@ -87,6 +87,13 @@ cfn-create-stack slrCld-(date +%s) --template-file solr_cfn_vpc_template.json --
  ./zkcli.sh -cmd upconfig -zkhost ec2-50-19-136-115.compute-1.amazonaws.com:2181/gpsn -confdir ~/Documents/solr/collections/data_audit/conf/ -confname data_audit
 
 
-== Credits == 
-Let us know if you have any issues!
--- [OpenSource Connections](http://o19s.com/osc/team)
+Credits
+------------
+Let us know if you have any issues or feedback.
+
+Written by 
+* [OpenSource Connections](http://o19s.com/osc/team)
+
+Specifically by
+* [Matt Overstreet](http://o19s.com/osc/team)
+* [Eric Pugh](http://o19s.com/osc/team)
