@@ -1,7 +1,8 @@
 cfn-solr
 ========
 
-Cloud formation script for solr servers.
+Cloud formation script for solr servers 
+by [OpenSource Connections](http://o19s.com)
 
 A cluster of n number of ec2-instances will be created running RHEL 6.4
 and solr in it's own tomcat instance.
