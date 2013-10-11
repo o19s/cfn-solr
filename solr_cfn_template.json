@@ -4,39 +4,20 @@
   "Description" : "Cloudformation template for Solr",
 
   "Mappings" : {
-    "AWSInstanceType2Arch" : {
-      "t1.micro" : { "Arch" : "64" },
-      "m1.small" : { "Arch" : "32" },
-      "m1.medium" : { "Arch" : "64" },
-      "m1.large" : { "Arch" : "64" },
-      "m1.xlarge" : { "Arch" : "64" },
-      "m2.xlarge" : { "Arch" : "64" },
-      "m2.2xlarge" : { "Arch" : "64" },
-      "m2.4xlarge" : { "Arch" : "64" },
-      "m3.xlarge" : { "Arch" : "64" },
-      "m3.2xlarge" : { "Arch" : "64" },
-      "c1.medium" : { "Arch" : "64" },
-      "c1.xlarge" : { "Arch" : "64" }
-    },
 
-    "AWSRegionArch2AMI" : {
-      "us-east-1" : { "32" : "ami-730c631a", "64" : "ami-7d0c6314" }
-      "us-west-1" : { "32" : "ami-27fad562", "64" : "ami-c7fad582" }
+    "AWSRegion2AMI" : {
+      "us-east-1" : { "redhat6d4" : "ami-7d0c6314", "amazonLinux" : "ami-05355a6c" },
+      "us-west-1" : { "redhat6d4" : "ami-c7fad582" },
+      "us-west-2" : { "redhat6d4" : "ami-7944d249" },
+      "eu-west-1" : { "redhat6d4" : "ami-23f6e057" },
+      "ap-southeast-1" : { "redhat6d4" : "ami-a6dc93f4" },
+      "ap-southeast-2" : { "redhat6d4" : "ami-a56dfd9f" },
+      "ap-northeast-1" : { "redhat6d4" : "ami-d14dc2d0" },
+      "sa-east-1" : { "redhat6d4" : "ami-22518b3f" }
     }
   },
 
   "Parameters" : {
-    "ZookeeperHost" : {
-      "Description" : "Hostname and port for one or more zookeeper servers seperated by a comma",
-      "Type" : "String"
-    },
-
-    "CloudShards" : {
-      "Description" : "How many shards should be created with the data for Solr Cloud",
-      "Type" : "String",
-      "Default" : "1"
-    },
-
     "SolrCloudSize" : {
       "Description" : "How many EC2 instances to launch with SolrCloud",
       "Type" : "String"
@@ -50,26 +31,142 @@
       "ConstraintDescription" : "must be a valid EC2 instance type."
     },
 
+    "LinuxDistro" : {
+      "Description" : "Linux distribution do use. Options are redhat6d4 or amazonLinux(default).",
+      "Type" : "String",
+      "Default" : "amazonLinux",
+      "AllowedValues" : [ "redhat6d4", "amazonLinux"],
+      "ConstraintDescription" : "must be a supported linux distribution"
+    },
+
     "KeyName" : {
       "Description" : "Name of an existing EC2 KeyPair to enable SSH access to the web server",
       "Type" : "String"
-    },
-
-    "SecurityGroup" : {
-      "Description" : "Name of an existing EC2 security group which allows communication between solr instances (usually TCP port 8983)",
-      "Type" : "String"
-    },
-
-    "PuppetSolrModuleURI" : {
-      "Description" : "[OPTIONAL] A url pointing to a zip or tar file containing the solr module for puppet",
-      "Type" : "String",
-      "Default" : "https://github.com/o19s/puppet-solr/tarball/master"
     }
+    
   },
 
   "Resources" : {
+    "SolrCloudSecurityGroup" : {
+      "Type" : "AWS::EC2::SecurityGroup",
+      "Properties" : {
+        "GroupDescription" : "Zookeeper and Solr requests from the world",
+        "SecurityGroupIngress" : [{
+          "IpProtocol" : "tcp",
+          "FromPort" : "8983",
+          "ToPort" : "8983",
+          "CidrIp" : "0.0.0.0/0"
+        }, {
+          "IpProtocol" : "tcp",
+          "FromPort" : "2181",
+          "ToPort" : "2181",
+          "CidrIp" : "0.0.0.0/0"
+        }, {
+         "IpProtocol" : "tcp",
+         "FromPort" : "22",
+         "ToPort" : "22",
+         "CidrIp" : "0.0.0.0/0"
+        }]
+      }
+    },
+
+    "ZookeeperInstance" : {
+      "Type" : "AWS::EC2::Instance",
+      "DependsOn" : "SolrCloudSecurityGroup",
+      "Metadata" : {
+        "AWS::CloudFormation::Init" : {
+          "configSets" : {
+            "get_repos" : [ "yumRepo" , "installService", "config", "startService" ]
+          },
+          "yumRepo" : {
+            "files" : {
+              "/etc/yum.repos.d/cloudera-cdh4.repo" : {
+                "mode" : "000644",
+                "owner" : "root",
+                "group" : "wheel",
+                "content" : { "Fn::Join" : ["", [
+                  "[cloudera-cdh4]", "\n",
+                  "name=Cloudera's Distribution for Hadoop, Version 4", "\n",
+                  "baseurl=http://archive.cloudera.com/cdh4/redhat/6/x86_64/cdh/4/", "\n",
+                  "gpgkey = http://archive.cloudera.com/cdh4/redhat/6/x86_64/cdh/RPM-GPG-KEY-cloudera", "\n",
+                  "gpgcheck = 1"
+                ]]
+                }
+              }
+            }
+          },
+          "installService" : {
+            "packages" : {
+              "yum" : {
+                "zookeeper-server" : []
+              }
+            }
+          },
+          "config" : {
+            "commands" : {
+              "initZk" : {
+                "command" : "service zookeeper-server init"
+              }
+            }
+          },
+          "startService" : {
+            "services" : {
+              "sysvinit" : {
+                "zookeeper-server" : {
+                  "enabled" : "true",
+                  "ensureRunning" : "true"
+                }
+              }
+            }
+          }
+        }
+      },
+
+      "Properties" : {
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegion2AMI", { "Ref" : "AWS::Region" }, { "Ref" : "LinuxDistro" } ] },
+        "KeyName" : { "Ref" : "KeyName" },
+        "InstanceType" : { "Ref" : "InstanceType" },
+        "SecurityGroups" : [ { "Ref" : "SolrCloudSecurityGroup" } ],
+
+        "UserData" : { "Fn::Base64" : { "Fn::Join" : ["",[
+          "#!/bin/bash","\n",
+          "# redirect logging to an error file","\n",
+          "exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1","\n",
+          "# add the puppet repository to yum", "\n",
+          "rpm -ivh http://yum.puppetlabs.com/el/6/products/i386/puppetlabs-release-6-7.noarch.rpm", "\n",
+          "yum install python-setuptools","\n",
+          "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz","\n",
+          "## Initialize CloudFormation bits","\n",
+          "cfn-init -c get_repos -v -s ", { "Ref" : "AWS::StackName" }, " -r ZookeeperInstance",
+          "   --region ", { "Ref" : "AWS::Region" }, " >> /tmp/cfn-init.log 2>&1 || error_exit $(</tmp/cfn-init.log)","\n",
+          "cfn-signal -s true \"", {"Ref" : "WaitForZkHandle"}, "\"\n"
+        ]
+        ]
+        }},
+        "Tags" : [ {
+          "Key" : "Name",
+          "Value" :  { "Fn::Join" : [ "", [{ "Ref" : "AWS::StackName"} , "-zk"]] },
+          "PropagateAtLaunch" : true
+        }] 
+      }
+    },
+
+    "WaitForZkHandle" : {
+      "Type" : "AWS::CloudFormation::WaitConditionHandle"
+    },
+
+    "WaitForZk" : {
+      "Type" : "AWS::CloudFormation::WaitCondition",
+      "DependsOn" : "ZookeeperInstance",
+      "Properties" : {
+        "Handle" : {"Ref" : "WaitForZkHandle"},
+        "Timeout" : "600"
+      }
+    },
+
     "SolrCloudGroup" : {
       "Type" : "AWS::AutoScaling::AutoScalingGroup",
+      "DependsOn" : [ "WaitForZkHandle", "SolrCloudSecurityGroup" ],
       "Properties" : {
         "LaunchConfigurationName" : { "Ref" : "SolrCloudLaunchConfig" },
         "AvailabilityZones" : { "Fn::GetAZs" : "" },
@@ -77,7 +174,7 @@
         "MaxSize" : { "Ref" : "SolrCloudSize" },
         "Tags" : [ {
           "Key" : "Name",
-          "Value" :  { "Fn::Join" : [ "", [{ "Ref" : "AWS::StackName"} , "-solr"]] },
+          "Value" :  { "Fn::Join" : [ "", [{ "Ref" : "AWS::StackName"} , "-sc"]] },
           "PropagateAtLaunch" : true
         }
         ]
@@ -96,7 +193,7 @@
               }
             },
             "sources" : {
-              "/etc/puppet/modules/solr" : { "Ref" : "PuppetSolrModuleURI" }
+              "/etc/puppet/modules/solr" : "https://github.com/o19s/puppet-solr/tarball/master"
             },
             "files" : {
               "/etc/puppet/base.pp" : {
@@ -109,7 +206,7 @@
                   "}", "\n",
                   "", "\n",
                   "class { \"solr::jetty\":", "\n",
-                  "  zookeeper_hosts => \"", { "Ref" : "ZookeeperHost" }, "\", ", "\n",
+                  "  zookeeper_hosts => \"", { "Fn::GetAtt" : ["ZookeeperInstance", "PrivateDnsName"] }, ":2181\"", "\n",
                   "}"
                 ]]
                 }
@@ -120,34 +217,33 @@
       },
 
       "Properties" : {
-        "ImageId" : { "Fn::FindInMap" : [ "AWSRegionArch2AMI", { "Ref" : "AWS::Region" }, 
-          { "Fn::FindInMap" : [ "AWSInstanceType2Arch", { "Ref" : "InstanceType" }, "Arch" ] } ] },
-          "KeyName" : { "Ref" : "KeyName" },
-          "InstanceType" : { "Ref" : "InstanceType" },
-          "SecurityGroups" : [ { "Ref" : "SecurityGroup" } ],
-          "BlockDeviceMappings" : [
-            {
-            "DeviceName" : "/dev/sda1",
-            "Ebs" : { "VolumeSize" : "50" } 
-          }
-          ],
+        "ImageId" : { "Fn::FindInMap" : [ "AWSRegion2AMI", { "Ref" : "AWS::Region" }, { "Ref" : "LinuxDistro" } ] },
+        "KeyName" : { "Ref" : "KeyName" },
+        "InstanceType" : { "Ref" : "InstanceType" },
+        "SecurityGroups" : [ { "Ref" : "SolrCloudSecurityGroup" } ],
+        "BlockDeviceMappings" : [
+          {
+          "DeviceName" : "/dev/sda1",
+          "Ebs" : { "VolumeSize" : "50" } 
+        }
+        ],
 
-          "UserData" : { "Fn::Base64" : { "Fn::Join" : ["",[
-            "#!/bin/bash","\n",
-            "# redirect logging to an error file","\n",
-            "exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1","\n",
-            "# add the puppet repository to yum", "\n",
-            "rpm -ivh http://yum.puppetlabs.com/el/6/products/i386/puppetlabs-release-6-7.noarch.rpm", "\n",
-            "yum install python-setuptools","\n",
-            "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz","\n",
-            "## Initialize CloudFormation bits","\n",
-            "cfn-init -v -s ", { "Ref" : "AWS::StackName" }, " -r SolrCloudLaunchConfig",
-            "   --region ", { "Ref" : "AWS::Region" }, " >> /tmp/cfn-init.log 2>&1 || error_exit $(</tmp/cfn-init.log)","\n",
-            "puppet apply /etc/puppet/base.pp", "\n",
-            "cfn-signal -s true \"", {"Ref" : "WaitForInstanceWaitHandle"}, "\"\n"
-          ]
-          ]
-          }}
+        "UserData" : { "Fn::Base64" : { "Fn::Join" : ["",[
+          "#!/bin/bash","\n",
+          "# redirect logging to an error file","\n",
+          "exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1","\n",
+          "# add the puppet repository to yum", "\n",
+          "rpm -ivh http://yum.puppetlabs.com/el/6/products/i386/puppetlabs-release-6-7.noarch.rpm", "\n",
+          "yum install python-setuptools","\n",
+          "easy_install https://s3.amazonaws.com/cloudformation-examples/aws-cfn-bootstrap-latest.tar.gz","\n",
+          "## Initialize CloudFormation bits","\n",
+          "cfn-init -v -s ", { "Ref" : "AWS::StackName" }, " -r SolrCloudLaunchConfig",
+          "   --region ", { "Ref" : "AWS::Region" }, " >> /tmp/cfn-init.log 2>&1 || error_exit $(</tmp/cfn-init.log)","\n",
+          "puppet apply /etc/puppet/base.pp", "\n",
+          "cfn-signal -s true \"", {"Ref" : "WaitForInstanceWaitHandle"}, "\"\n"
+        ]
+        ]
+        }}
       }
     },
 
