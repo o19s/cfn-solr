@@ -5,6 +5,7 @@
 
   "Mappings" : {
 
+<<<<<<< HEAD
     "AWSRegion2AMI" : {
       "us-east-1" : { "redhat6d4" : "ami-7d0c6314", "amazonLinux" : "ami-05355a6c" },
       "us-west-1" : { "redhat6d4" : "ami-c7fad582" },
@@ -14,10 +15,24 @@
       "ap-southeast-2" : { "redhat6d4" : "ami-a56dfd9f" },
       "ap-northeast-1" : { "redhat6d4" : "ami-d14dc2d0" },
       "sa-east-1" : { "redhat6d4" : "ami-22518b3f" }
+=======
+    "AWSRegionArch2AMI" : {
+      "us-east-1" : { "32" : "ami-730c631a", "64" : "ami-7d0c6314" },
+      "us-west-1" : { "32" : "ami-27fad562", "64" : "ami-c7fad582" }
+>>>>>>> 5c1a1fba8d035def8ab920a79aaf2d3d206ec2c3
     }
   },
 
   "Parameters" : {
+<<<<<<< HEAD
+=======
+    "ZookeeperHost" : {
+      "Description" : "Hostname and port for one or more zookeeper servers seperated by a comma",
+      "Type" : "String"
+    },
+
+
+>>>>>>> 5c1a1fba8d035def8ab920a79aaf2d3d206ec2c3
     "SolrCloudSize" : {
       "Description" : "How many EC2 instances to launch with SolrCloud",
       "Type" : "String"
